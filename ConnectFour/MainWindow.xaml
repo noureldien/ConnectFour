@@ -9,6 +9,5 @@
         <GroupBox Header="Game Board" HorizontalAlignment="Stretch" Margin="10,10,10,60" VerticalAlignment="Stretch">
             <TextBox HorizontalAlignment="Stretch" Margin="10" BorderBrush="LightGray" TextWrapping="Wrap" Text="TextBox" VerticalAlignment="Stretch"/>
         </GroupBox>
-
     </Grid>
 </Window>
