@@ -1,10 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Linq;
+using System.Media;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Data;
 using System.Windows.Documents;
 using System.Windows.Input;
@@ -22,11 +25,38 @@ namespace ConnectFour
     {
         #region Enums
 
-        private enum Player
+        /// <summary>
+        /// Type of the player.
+        /// </summary>
+        private enum PlayerType
         {
+            [Description("Human")]
             Human = 0,
+            [Description("Computer")]
             Computer = 1,
-        };
+        }
+
+        /// <summary>
+        /// Status of the game.
+        /// </summary>
+        private enum GameStatus
+        {
+            [Description("Stopped")]
+            Stopped = 0,
+            [Description("Started")]
+            Started = 1,
+        }
+
+        /// <summary>
+        /// Type of the sound effect.
+        /// </summary>
+        private enum SoundType
+        {
+            [Description("Error")]
+            Error = 0,
+            [Description("Success")]
+            Success = 1,
+        }
 
         #endregion
 
@@ -35,15 +65,15 @@ namespace ConnectFour
         /// <summary>
         /// Represents empty tile.
         /// </summary>
-        private const char TileE = '-';
+        private const char TileEmpty = '-';
         /// <summary>
-        /// Represents tile for player/opponent one.
+        /// Represents tile for player/opponent one 'Human'.
         /// </summary>
-        private const char TileA = '☺';
+        private const char TileHuman = '☺';
         /// <summary>
-        /// Represents tile for player/opponent two.
+        /// Represents tile for player/opponent two 'Computer'.
         /// </summary>
-        private const char TileB = '☻';
+        private const char TileComputer = '☻';
         /// <summary>
         /// Min width for the game board.
         /// </summary>
@@ -56,6 +86,18 @@ namespace ConnectFour
         /// Min steps-to-win for the game.
         /// </summary>
         private const int MinTilesToWin = 3;
+        /// <summary>
+        /// Width of the game board.
+        /// </summary>
+        private const int BoardWidth = 7;
+        /// <summary>
+        /// Height of the game board.
+        /// </summary>
+        private const int BoardHeight = 6;
+        /// <summary>
+        /// How many connected tiles (horizontally, vertically or diaglonally) required to win.
+        /// </summary>
+        private const int TilesToWin = 4;
 
         #endregion
 
@@ -70,29 +112,37 @@ namespace ConnectFour
         /// </summary>
         private int levels;
         /// <summary>
-        /// Width of the game board.
-        /// </summary>
-        private int width;
-        /// <summary>
-        /// Height of the game board.
-        /// </summary>
-        private int height;
-        /// <summary>
-        /// How many connected tiles (horizontally, vertically or diaglonally) required to win.
-        /// </summary>
-        private int tilesToWin;
-        /// <summary>
         /// Current state of the game board.
         /// </summary>
-        private char[][] gameState;
+        private char[][] boardState;
         /// <summary>
         /// Current player who has to play.
         /// </summary>
-        private Player player;
+        private PlayerType currentPlayer;
+        /// <summary>
+        /// Current status of the game (started/stopped).
+        /// </summary>
+        private GameStatus gameStatus;
         /// <summary>
         /// The tile of the current player.
         /// </summary>
         private char playerTile;
+        /// <summary>
+        /// Matrix of blocks to be used by players.
+        /// </summary>
+        private Ellipse[][] blocks;
+        /// <summary>
+        /// Brush with transparent color.
+        /// </summary>
+        private Brush transparentBrush;
+        /// <summary>
+        /// Brush with red color.
+        /// </summary>
+        private Brush redBrush;
+        /// <summary>
+        /// Bursh with blue color.
+        /// </summary>
+        private Brush blueBrush;
 
         #endregion
 
@@ -121,6 +171,113 @@ namespace ConnectFour
         }
 
         /// <summary>
+        /// Button
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
+        private void ButtonStart_Click(object sender, RoutedEventArgs e)
+        {
+            // stat or reset of the game
+            if (gameStatus == GameStatus.Stopped)
+            {
+                groupBoxFirstPlayer.IsEnabled = false;
+                buttonStart.Content = "■";
+                buttonStart.ToolTip = "End the game.";
+                StartGame();
+                gameStatus = GameStatus.Started;
+            }
+            else if (gameStatus == GameStatus.Started)
+            {
+                groupBoxFirstPlayer.IsEnabled = true;
+                buttonStart.Content = "►";
+                buttonStart.ToolTip = "Start the game.";
+                ResetGame();
+                gameStatus = GameStatus.Stopped;
+            }
+
+            labelGameStatus.Content = gameStatus.Description();
+        }
+
+        /// <summary>
+        /// Toggle the player to start the game.
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
+        private void RadioButtonPlayer_Click(object sender, RoutedEventArgs e)
+        {
+            // change the current player
+            object tagObject = ((ToggleButton)sender).Tag;
+            string tagString = (string)tagObject;
+            int tagInt = int.Parse(tagString);
+            currentPlayer = (PlayerType)tagInt;
+
+            labelCurrentPlayer.Content = currentPlayer.Description();
+            ellipseCurrentPlayer.Fill = PlayerColor(currentPlayer);
+        }
+
+        /// <summary>
+        /// Ellipse is clicked, add new block to the game.
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
+        private void Ellipse_MouseDown(object sender, MouseButtonEventArgs e)
+        {
+            if (currentPlayer == PlayerType.Computer)
+            {
+                PlaySound(SoundType.Error);
+                return;
+            }
+
+            // if game not start and player is 'Human', then start the game
+            // and place the first block
+            if (gameStatus == GameStatus.Stopped)
+            {
+                ButtonStart_Click(sender, e);
+            }
+
+            // get the index of the block
+            Ellipse ellipse = (Ellipse)sender;
+            int row = int.Parse(ellipse.GetValue(Grid.RowProperty).ToString());
+            int column = int.Parse(ellipse.GetValue(Grid.ColumnProperty).ToString()) - 1;
+
+            // check if this is acceptable play
+            // i.e there is an empty tile in the current clicked column
+            bool isEmptyTile = false;
+            for (int y = 0; y < BoardHeight; y++)
+            {
+                if (boardState[y][column] == TileEmpty)
+                {
+                    isEmptyTile = true;
+                    break;
+                }
+            }
+
+            if (!isEmptyTile)
+            {
+                PlaySound(SoundType.Error);
+                return;
+            }
+
+            // fill in the current tile buy 'Human', switch player
+            // and call the computer to play the next step
+            for (int y = BoardHeight - 1; y > -1; y--)
+            {
+                if (boardState[y][column] == TileEmpty)
+                {
+                    blocks[y][column].Fill = PlayerColor(currentPlayer);
+                    break;
+                }
+            }
+
+            // switch the current player
+            currentPlayer = PlayerType.Computer;
+            ellipseCurrentPlayer.Fill = PlayerColor(currentPlayer);
+            labelCurrentPlayer.Content = currentPlayer.Description();
+
+            Utils.DebugLine("Row, Column: " + row + ", " + column);
+        }
+
+        /// <summary>
         /// Dispose objects and stop search threat (if working) before close.
         /// </summary>
         /// <param name="sender"></param>
@@ -139,31 +296,39 @@ namespace ConnectFour
         /// </summary>
         private void Initialize()
         {
-            // setting game board variables
-            width = 5;
-            height = 4;
-            tilesToWin = 3;
-
             // setting the current player
-            player = Player.Human;
-            playerTile = TileA;
+            currentPlayer = PlayerType.Human;
+            playerTile = TileHuman;
 
-            nodes = 0;
-            levels = 0;
+            // color brushes
+            transparentBrush = new SolidColorBrush(Colors.Transparent);
+            redBrush = new SolidColorBrush(Colors.Red);
+            blueBrush = new SolidColorBrush(Colors.Blue);
 
-            // define initial state
-            gameState = new char[height][];
-            for (int y = 0; y < height; y++)
+            // list of the blocks (circles)
+            blocks = new Ellipse[BoardHeight][]
             {
-                gameState[y] = new char[width];
-                for (int x = 0; x < width; x++)
+                new Ellipse[BoardWidth]{ellipseA6, ellipseB6, ellipseC6, ellipseD6, ellipseE6, ellipseF6, ellipseG6},
+                new Ellipse[BoardWidth]{ellipseA5, ellipseB5, ellipseC5, ellipseD5, ellipseE5, ellipseF5, ellipseG5},
+                new Ellipse[BoardWidth]{ellipseA4, ellipseB4, ellipseC4, ellipseD4, ellipseE4, ellipseF4, ellipseG4},
+                new Ellipse[BoardWidth]{ellipseA3, ellipseB3, ellipseC3, ellipseD3, ellipseE3, ellipseF3, ellipseG3},
+                new Ellipse[BoardWidth]{ellipseA2, ellipseB2, ellipseC2, ellipseD2, ellipseE2, ellipseF2, ellipseG2},
+                new Ellipse[BoardWidth]{ellipseA1, ellipseB1, ellipseC1, ellipseD1, ellipseE1, ellipseF1, ellipseG1},
+            };
+
+            ResetGame();
+
+            // event handlers for all the ellipses
+            for (int y = 0; y < BoardHeight; y++)
+            {
+                for (int x = 0; x < BoardWidth; x++)
                 {
-                    gameState[y][x] = TileE;
+                    blocks[y][x].MouseDown += Ellipse_MouseDown;
                 }
             }
 
             Utils.DebugLine("Initial State");
-            Utils.DebugLine(FormatState(gameState));
+            Utils.DebugLine(FormatState(boardState));
         }
 
         /// <summary>
@@ -175,11 +340,11 @@ namespace ConnectFour
             StringBuilder stringBuilder = new StringBuilder();
             stringBuilder.Append("\n");
 
-            for (int y = 0; y < height; y++)
+            for (int y = 0; y < BoardHeight; y++)
             {
                 stringBuilder.Append("\n| ");
 
-                for (int x = 0; x < width; x++)
+                for (int x = 0; x < BoardWidth; x++)
                 {
                     stringBuilder.Append(String.Format("{0} ", state[y][x]));
                 }
@@ -190,30 +355,100 @@ namespace ConnectFour
             return stringBuilder.ToString();
         }
 
-        #endregion
-
-        #region Search Methods
-
         /// <summary>
         /// Switch the current player and his/here/its tile.
         /// </summary>
         private void SwitchPlayer()
         {
-            if (player == Player.Human)
+            if (currentPlayer == PlayerType.Human)
             {
-                player = Player.Computer;
-                playerTile = TileA;
+                currentPlayer = PlayerType.Computer;
+                playerTile = TileHuman;
             }
-            else if (player == Player.Computer)
+            else if (currentPlayer == PlayerType.Computer)
             {
-                player = Player.Human;
-                playerTile = TileB;
+                currentPlayer = PlayerType.Human;
+                playerTile = TileComputer;
             }
             else
             {
                 throw new Exception("Unknown player type in SwitchPlayer() method.");
             }
         }
+
+        /// <summary>
+        /// Get the color of the given player.
+        /// </summary>
+        /// <returns></returns>
+        private Brush PlayerColor(PlayerType player)
+        {
+            return player == PlayerType.Human ? redBrush : blueBrush;
+        }
+
+        /// <summary>
+        /// Start the game.
+        /// </summary>
+        private void StartGame()
+        {
+            // game stats
+            //MiniMax(gameState, 6);
+        }
+
+        /// <summary>
+        /// Reset the game.
+        /// </summary>
+        private void ResetGame()
+        {
+            // reset the tiles
+            for (int y = 0; y < BoardHeight; y++)
+            {
+                for (int x = 0; x < BoardWidth; x++)
+                {
+                    blocks[y][x].Fill = transparentBrush;
+                }
+            }
+
+            // define initial state
+            boardState = new char[BoardHeight][];
+            for (int y = 0; y < BoardHeight; y++)
+            {
+                boardState[y] = new char[BoardWidth];
+                for (int x = 0; x < BoardWidth; x++)
+                {
+                    boardState[y][x] = TileEmpty;
+                }
+            }
+
+            // reset the counters
+            nodes = 0;
+            levels = 0;
+
+            // game stats
+            labelGameStatus.Content = gameStatus.Description();
+            labelCurrentPlayer.Content = currentPlayer.Description();
+            ellipseCurrentPlayer.Fill = PlayerColor(currentPlayer);
+        }
+
+        /// <summary>
+        /// Play the give tye of sound.
+        /// </summary>
+        private void PlaySound(SoundType soundType)
+        {
+            switch (soundType)
+            {
+                case SoundType.Error:
+                    SystemSounds.Beep.Play();
+                    break;
+                case SoundType.Success:
+                    break;
+                default:
+                    break;
+            }
+        }
+
+        #endregion
+
+        #region Search Methods
 
         /// <summary>
         /// Breadth first search algorithm until reaching the given maxLevel. If maxLevel = 0, there is
@@ -281,11 +516,11 @@ namespace ConnectFour
             List<char[][]> children = new List<char[][]>();
             char[][] child = null;
 
-            for (int x = 0; x < width; x++)
+            for (int x = 0; x < BoardWidth; x++)
             {
-                for (int y = height - 1; y > -1; y--)
+                for (int y = BoardHeight - 1; y > -1; y--)
                 {
-                    if (state[y][x] == TileE)
+                    if (state[y][x] == TileEmpty)
                     {
                         child = (char[][])state.Clone();
                         child[y][x] = playerTile;
@@ -296,8 +531,6 @@ namespace ConnectFour
 
             return children.ToArray();
         }
-
-        int hi = 0;
 
         /// <summary>
         /// Weather is the given state is considered a winning one or not.
@@ -311,13 +544,13 @@ namespace ConnectFour
 
             // look for n connected tiles horizontally
             // tilesToWin
-            for (int x = 0; x < width - MaxWidth; x++)
+            for (int x = 0; x < BoardWidth - MaxWidth; x++)
             {
 
             }
 
             // look for n connected tiles vertically
-            for (int y = height; y > 0; y--)
+            for (int y = BoardHeight; y > 0; y--)
             {
 
             }
@@ -326,10 +559,5 @@ namespace ConnectFour
         }
 
         #endregion
-
-        private void Button_Click(object sender, RoutedEventArgs e)
-        {
-            MiniMax(gameState, 6);
-        }
     }
 }
