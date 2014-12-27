@@ -436,7 +436,7 @@ namespace ConnectFour
         {
             int steps = 0;
             StringBuilder stringBuilder = new StringBuilder();
-            while (node != null)
+            while (node.Parent != null)
             {
                 steps++;
                 stringBuilder.Append(FormatState(node.State));
