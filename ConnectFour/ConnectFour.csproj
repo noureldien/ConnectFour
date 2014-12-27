@@ -68,8 +68,9 @@
       <DependentUpon>App.xaml</DependentUpon>
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="App\Enums.cs" />
     <Compile Include="App\Utils.cs" />
-    <Compile Include="Extensions.cs" />
+    <Compile Include="App\Extensions.cs" />
     <Compile Include="Model\Level.cs" />
     <Compile Include="MainWindow.xaml.cs">
       <DependentUpon>MainWindow.xaml</DependentUpon>
@@ -77,6 +78,7 @@
     </Compile>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Model\MinimaxNode.cs" />
     <Compile Include="Model\Node.cs" />
     <Compile Include="Properties\AssemblyInfo.cs">
       <SubType>Code</SubType>

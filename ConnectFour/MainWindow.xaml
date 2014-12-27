@@ -1,7 +1,7 @@
 ﻿<Window x:Class="ConnectFour.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"        
-        Title="Connect Four" Height="530" Width="470"
+        Title="Connect Four" Height="540" Width="470"
         ResizeMode="NoResize" WindowStartupLocation="CenterScreen"
         Icon="Images/ic_Icon_64.png"
         Closing="Window_Closing" Loaded="Window_Loaded">
@@ -130,7 +130,13 @@
                 </Grid>
             </Border>
         </GroupBox>
-        <GroupBox x:Name="groupBoxFirstPlayer" Header="First Player" HorizontalAlignment="Left" Margin="10,359,0,0" VerticalAlignment="Top" Width="110" Height="78">
+        <GroupBox x:Name="groupBoxSearchType" Header="Search Type" HorizontalAlignment="Left" Margin="10,360,0,0" VerticalAlignment="Top" Width="110" Height="82">
+            <StackPanel Orientation="Vertical">
+                <RadioButton x:Name="radioButtonMinimax" Content="Minimax" Tag="0" GroupName="SearchType" Width="80" Margin="0,10,0,0" HorizontalAlignment="Left" IsChecked="True" Click="RadioButtonSearch_Click"/>
+                <RadioButton x:Name="radioButtonAlphaBeta" Content="Alpha-Beta" Tag="1" GroupName="SearchType" Width="80" Margin="0,10,0,0" HorizontalAlignment="Left" Click="RadioButtonSearch_Click"/>
+            </StackPanel>
+        </GroupBox>
+        <GroupBox x:Name="groupBoxFirstPlayer" Header="First Player" HorizontalAlignment="Left" Margin="130,360,0,0" VerticalAlignment="Top" Width="110" Height="82">
             <StackPanel Orientation="Vertical">
                 <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
                     <RadioButton x:Name="radioButtonHuman" Content="Human" Tag="0" GroupName="FirstPlayer" Width="80" IsChecked="True" Click="RadioButtonPlayer_Click"/>
@@ -141,16 +147,18 @@
                     <Ellipse StrokeThickness="1" Stroke="Black" Fill="Blue" VerticalAlignment="Center" Width="8" Height="8"/>
                 </StackPanel>
             </StackPanel>
-        </GroupBox>        
-        <GroupBox Header="Game Info" Margin="135,359,10,17">
+        </GroupBox>
+        <GroupBox Header="Game Info" Margin="250,360,10,17">
             <Grid>
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="100"/>
+                    <ColumnDefinition Width="90"/>
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
                 <StackPanel Orientation="Vertical" Grid.Column="0">
                     <Label Content="Game Status:"/>
                     <Label Content="Current Player:"/>
+                    <Label Content="Levels:"/>
+                    <Label Content="Nodes:"/>
                 </StackPanel>
                 <StackPanel Orientation="Vertical" Grid.Column="1">
                     <Label x:Name="labelGameStatus" Content="Stopped"/>
@@ -158,9 +166,11 @@
                         <Label x:Name="labelCurrentPlayer" Content="Human"/>
                         <Ellipse x:Name="ellipseCurrentPlayer" StrokeThickness="1" Stroke="Black" Fill="Red" Margin="10,2,0,0" VerticalAlignment="Center" Width="8" Height="8"/>
                     </StackPanel>
+                    <Label x:Name="labelGameLevels"/>
+                    <Label x:Name="labelGameNodes"/>
                 </StackPanel>
             </Grid>
         </GroupBox>
-        <Button x:Name="buttonStart" Content="►" ToolTip="Start the game." Margin="10,450,0,0" VerticalAlignment="Top" Click="ButtonStart_Click" Height="26" FontFamily="Arial" FontSize="14" HorizontalAlignment="Left" Width="110"/>
+        <Button x:Name="buttonStart" Content="►" ToolTip="Start the game." Margin="10,460,0,0" VerticalAlignment="Top" Click="ButtonStart_Click" Height="26" FontFamily="Arial" FontSize="14" HorizontalAlignment="Left" Width="230"/>
     </Grid>
 </Window>

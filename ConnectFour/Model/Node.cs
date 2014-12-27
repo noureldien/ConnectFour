@@ -2,12 +2,16 @@
 
 namespace ConnectFour
 {
-    public class Node
+    public abstract class Node
     {
         public char[][] State { get; set; }
         public Node Parent { get; set; }
         public Node[] Children { get; set; }
-        public int MinMax { get; set; }
+
+        public Node()
+        {
+
+        }
                 
         public Node(char[][] state, Node parent)
         {
