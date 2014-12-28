@@ -70,48 +70,36 @@ namespace ConnectFour
         /// <summary>
         /// Represents tile for player/opponent one 'Human'.
         /// </summary>
-        private const char TileH = '☺';
+        private const char TileH = 'x';
         /// <summary>
         /// Represents tile for player/opponent two 'Computer'.
         /// </summary>
-        private const char TileC = '☻';
-        /// <summary>
-        /// Min width for the game board.
-        /// </summary>
-        private const int MinBoardWidth = 4;
-        /// <summary>
-        /// Min height for the game board.
-        /// </summary>
-        private const int MinBoardHeight = 4;
-        /// <summary>
-        /// Min steps-to-win for the game.
-        /// </summary>
-        private const int MinTilesToWin = 3;
-        /// <summary>
-        /// Width of the game board.
-        /// </summary>
-        private const int BoardWidth = 7;
-        /// <summary>
-        /// Height of the game board.
-        /// </summary>
-        private const int BoardHeight = 6;
-        /// <summary>
-        /// How many connected tiles (horizontally, vertically or diaglonally) required to win.
-        /// </summary>
-        private const int TilesToWin = 4;
+        private const char TileC = 'o';
 
         #endregion
 
         #region Variables
 
         /// <summary>
+        /// Width of the game board.
+        /// </summary>
+        private int boardWidth = 4;
+        /// <summary>
+        /// Height of the game board.
+        /// </summary>
+        private int boardHeight = 3;
+        /// <summary>
+        /// How many connected tiles (horizontally, vertically or diaglonally) required to win.
+        /// </summary>
+        private int tilesToWin = 3;
+        /// <summary>
         /// Counter for the number of nodes created in our current search.
         /// </summary>
-        private int nodes;
+        private int nodeCount;
         /// <summary>
         /// Counter for the number of levels reached in our current search.
         /// </summary>
-        private int levels;
+        private int levelCount;
         /// <summary>
         /// Current state of the game board.
         /// </summary>
@@ -190,8 +178,11 @@ namespace ConnectFour
             // stat or reset of the game
             if (gameStatus == GameStatus.Stopped)
             {
+                ResetGame();
+                groupBoxGameBoard.IsEnabled = true;
                 groupBoxSearchType.IsEnabled = false;
                 groupBoxFirstPlayer.IsEnabled = false;
+                groupBoxOptions.IsEnabled = false;
                 buttonStart.Content = "■";
                 buttonStart.ToolTip = "End the game.";
                 gameStatus = GameStatus.Started;
@@ -204,12 +195,11 @@ namespace ConnectFour
             else if (gameStatus == GameStatus.Started)
             {
                 StopThreads();
-                groupBoxGameBoard.IsEnabled = true;
-                groupBoxSearchType.IsEnabled = false;
+                groupBoxSearchType.IsEnabled = true;
                 groupBoxFirstPlayer.IsEnabled = true;
+                groupBoxOptions.IsEnabled = true;
                 buttonStart.Content = "►";
                 buttonStart.ToolTip = "Start the game.";
-                ResetGame();
                 gameStatus = GameStatus.Stopped;
             }
 
@@ -245,6 +235,40 @@ namespace ConnectFour
             string tagString = (string)tagObject;
             int tagInt = int.Parse(tagString);
             searchType = (SearchType)tagInt;
+        }
+
+        /// <summary>
+        /// Change width of the game board.
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
+        private void SliderBoardWidth_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            boardWidth = (int)e.NewValue;
+            InitializeGameBoard();
+            ResetGame();
+        }
+
+        /// <summary>
+        /// Change height of the game board.
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
+        private void SliderBoardHeight_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            boardHeight = (int)e.NewValue;
+            InitializeGameBoard();
+            ResetGame();
+        }
+
+        /// <summary>
+        /// Change number of tiles required to win.
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
+        private void SliderTilesToWin_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            tilesToWin = (int)e.NewValue;
         }
 
         /// <summary>
@@ -303,26 +327,104 @@ namespace ConnectFour
             redBrush = new SolidColorBrush(Colors.Red);
             blueBrush = new SolidColorBrush(Colors.Blue);
 
-            // list of the blocks (circles)
-            blocks = new Ellipse[BoardHeight][]
-            {
-                new Ellipse[BoardWidth]{ellipseA6, ellipseB6, ellipseC6, ellipseD6, ellipseE6, ellipseF6, ellipseG6},
-                new Ellipse[BoardWidth]{ellipseA5, ellipseB5, ellipseC5, ellipseD5, ellipseE5, ellipseF5, ellipseG5},
-                new Ellipse[BoardWidth]{ellipseA4, ellipseB4, ellipseC4, ellipseD4, ellipseE4, ellipseF4, ellipseG4},
-                new Ellipse[BoardWidth]{ellipseA3, ellipseB3, ellipseC3, ellipseD3, ellipseE3, ellipseF3, ellipseG3},
-                new Ellipse[BoardWidth]{ellipseA2, ellipseB2, ellipseC2, ellipseD2, ellipseE2, ellipseF2, ellipseG2},
-                new Ellipse[BoardWidth]{ellipseA1, ellipseB1, ellipseC1, ellipseD1, ellipseE1, ellipseF1, ellipseG1},
-            };
-
+            InitializeGameBoard();
             ResetGame();
 
-            // event handlers for all the ellipses
-            for (int y = 0; y < BoardHeight; y++)
+            // event handlers
+            sliderBoardHeight.ValueChanged += SliderBoardHeight_ValueChanged;
+            sliderBoardWidth.ValueChanged += SliderBoardWidth_ValueChanged;
+            sliderTilesToWin.ValueChanged += SliderTilesToWin_ValueChanged;
+        }
+
+        /// <summary>
+        /// Initialize game board.
+        /// </summary>
+        private void InitializeGameBoard()
+        {
+            gridGameBoard.Children.Clear();
+            gridGameBoard.ColumnDefinitions.Clear();
+            gridGameBoard.RowDefinitions.Clear();
+
+            char[] characters = new char[] { 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h' };
+            Style styleEllipse = (Style)FindResource("StyleEllipse");
+
+            Style styleLabelRowNames = (Style)FindResource("StyleLabelRowNames");
+            Style styleBorderRowNames = (Style)FindResource("StyleBorderRowNames");
+            Style styleLabelColumnNames = (Style)FindResource("StyleLabelColumnNames");
+            Style styleBorderColumnNames = (Style)FindResource("StyleBorderColumnNames");
+
+            // create ellipses
+            Ellipse ellipse;
+            blocks = new Ellipse[boardHeight][];
+            for (int y = 0; y < boardHeight; y++)
             {
-                for (int x = 0; x < BoardWidth; x++)
+                blocks[y] = new Ellipse[boardWidth];
+                for (int x = 0; x < boardWidth; x++)
                 {
-                    blocks[y][x].MouseDown += Ellipse_MouseDown;
+                    ellipse = new Ellipse();
+                    ellipse.SetValue(Grid.RowProperty, y);
+                    ellipse.SetValue(Grid.ColumnProperty, x + 1);
+                    ellipse.Style = styleEllipse;
+                    ellipse.MouseDown += Ellipse_MouseDown;
+
+                    gridGameBoard.Children.Add(ellipse);
+                    blocks[y][x] = ellipse;
                 }
+            }
+
+            // add column and row definitions
+            gridGameBoard.ColumnDefinitions.Add(new ColumnDefinition()
+            {
+                Width = new GridLength(26, GridUnitType.Pixel),
+            });
+            for (int x = 0; x < boardWidth; x++)
+            {
+                gridGameBoard.ColumnDefinitions.Add(new ColumnDefinition()
+                {
+                    Width = new GridLength(1, GridUnitType.Star),
+                });
+            }
+            for (int y = 0; y < boardHeight; y++)
+            {
+                gridGameBoard.RowDefinitions.Add(new RowDefinition()
+                {
+                    Height = new GridLength(1, GridUnitType.Star),
+                });
+            }
+            gridGameBoard.RowDefinitions.Add(new RowDefinition()
+            {
+                Height = new GridLength(26, GridUnitType.Pixel),
+            });
+
+            // create column names and row names
+            Border border;
+            for (int x = 0; x < boardWidth; x++)
+            {
+                border = new Border();
+                border.Child = new Label()
+                {
+                    Content = characters[x],
+                    Style = styleLabelColumnNames,
+                };
+                border.Style = styleBorderColumnNames;
+                border.SetValue(Grid.ColumnProperty, x + 1);
+                border.SetValue(Grid.RowProperty, boardHeight);
+
+                gridGameBoard.Children.Add(border);
+            }
+            for (int y = 0; y < boardHeight; y++)
+            {
+                border = new Border();
+                border.Child = new Label()
+                {
+                    Content = boardHeight - y,
+                    Style = styleLabelRowNames,
+                };
+                border.Style = styleBorderRowNames;
+                border.SetValue(Grid.RowProperty, y);
+                border.SetValue(Grid.ColumnProperty, 0);
+
+                gridGameBoard.Children.Add(border);
             }
         }
 
@@ -399,8 +501,8 @@ namespace ConnectFour
         /// </summary>
         private void UpdateCounters()
         {
-            labelGameLevels.Content = String.Format("{0:0,0}", levels);
-            labelGameNodes.Content = String.Format("{0:0,0}", nodes);
+            labelGameLevels.Content = String.Format("{0:0,0}", levelCount);
+            labelGameNodes.Content = String.Format("{0:0,0}", nodeCount);
 
             //TimeSpan duration = ((DateTime.Now - startTime) + processDuration);
             //labelTime.Content = String.Format("{0:00}:{1:00}", duration.TotalMinutes, duration.Seconds);
@@ -414,11 +516,11 @@ namespace ConnectFour
         {
             StringBuilder stringBuilder = new StringBuilder();
 
-            for (int y = 0; y < BoardHeight; y++)
+            for (int y = 0; y < boardHeight; y++)
             {
                 stringBuilder.Append("| ");
 
-                for (int x = 0; x < BoardWidth; x++)
+                for (int x = 0; x < boardWidth; x++)
                 {
                     stringBuilder.Append(String.Format("{0} ", state[y][x]));
                 }
@@ -432,7 +534,7 @@ namespace ConnectFour
         /// <summary>
         /// Format the branch as string; the barnch that ends with the given node. Bottom up.
         /// </summary>
-        private string FormatBranch(Node node)
+        private string FormatBranch(MinimaxNode node)
         {
             int steps = 0;
             StringBuilder stringBuilder = new StringBuilder();
@@ -443,9 +545,32 @@ namespace ConnectFour
                 stringBuilder.Append("\n");
                 node = node.Parent;
             }
-            
+
             string result = stringBuilder.ToString();
             return result;
+        }
+
+        /// <summary>
+        /// Print the search tree.
+        /// </summary>
+        /// <param name="levels"></param>
+        private void PrintSearchTree(List<MinimaxLevel> levels)
+        {
+            // for testing
+            StringBuilder stBuilder = new StringBuilder();
+            for (int i = 0; i < levels.Count; i++)
+            {
+                foreach (MinimaxNode n in levels[i].Nodes)
+                {
+                    stBuilder.AppendFormat("\nLevel: {0}, Value: {1}\n{2}", (i + 1), n.Value, FormatState(n.State));
+                }
+            }
+
+            string output = stBuilder.ToString();
+            Dispatcher.Invoke(() =>
+            {
+                textBoxOutput.Text = output;
+            });
         }
 
         #endregion
@@ -461,7 +586,7 @@ namespace ConnectFour
             // check if this is acceptable play
             // i.e there is an empty tile in the current clicked column
             bool isEmptyTile = false;
-            for (int y = 0; y < BoardHeight; y++)
+            for (int y = 0; y < boardHeight; y++)
             {
                 if (boardState[y][column] == TileE)
                 {
@@ -477,7 +602,7 @@ namespace ConnectFour
             }
 
             // fill in the current tile buy 'Human'
-            for (int y = BoardHeight - 1; y > -1; y--)
+            for (int y = boardHeight - 1; y > -1; y--)
             {
                 if (boardState[y][column] == TileE)
                 {
@@ -515,8 +640,8 @@ namespace ConnectFour
         private void NextStepComputer()
         {
             // reset counters and update UI
-            levels = 0;
-            nodes = 0;
+            levelCount = 0;
+            nodeCount = 0;
             UpdateCounters();
 
             // initialize the search and info threads.
@@ -556,14 +681,16 @@ namespace ConnectFour
             // check if the search algorithm didn't find a column
             if (column == -1)
             {
-                ButtonStart_Click(null, null);
-                MessageBox.Show("No column found by the search algorithm!", "Game", MessageBoxButton.OK);
+                string message = "Algorithm couldn't find a column, it returned -1";
+                FinishGame(message);
                 return;
             }
 
+            Utils.DebugLine("Minimax column: " + column);
+
             // fill in the current tile buy 'Computer', switch player
             // and let 'Human' play the next step
-            for (int y = BoardHeight - 1; y > -1; y--)
+            for (int y = boardHeight - 1; y > -1; y--)
             {
                 if (boardState[y][column] == TileE)
                 {
@@ -572,6 +699,7 @@ namespace ConnectFour
                     {
                         blocks[y][column].Fill = PlayerColor(currentPlayer);
                     });
+                    Utils.DebugLine("Filled tile (x, y): " + column + ", " + y);
                     break;
                 }
             }
@@ -614,8 +742,8 @@ namespace ConnectFour
             // then check if it contains empty tiles
             while (!emptyColumn)
             {
-                column = random.Next(0, BoardWidth);
-                for (int y = BoardHeight - 1; y > -1; y--)
+                column = random.Next(0, boardWidth);
+                for (int y = boardHeight - 1; y > -1; y--)
                 {
                     if (state[y][column] == TileE)
                     {
@@ -638,68 +766,166 @@ namespace ConnectFour
         /// <returns></returns>
         private int Minimax(char[][] state)
         {
-            const int maxLevel = 8;
+            int maxLevels;
+            int tileCount = boardWidth * boardHeight;
+            if (tileCount <= 12)
+            {
+                maxLevels = 10;
+            }
+            else if (tileCount <= 20)
+            {
+                maxLevels = 8;
+            }
+            else
+            {
+                maxLevels = 7;
+            }
 
             // reset counters
-            nodes = 0;
-            levels = 0;
+            nodeCount = 0;
+            levelCount = 0;
 
-            PlayerType levelPlayer = currentPlayer;
-            MinimaxNode initialNode = new MinimaxNode(state, null, levelPlayer);
-            Level currentLevel = new Level(initialNode);
+            bool isMax = (currentPlayer == PlayerType.Computer);
+            int minimaxValue;
+            char nextLevelTile;
+
+            MinimaxNode initialNode = new MinimaxNode(state, null);
+            List<MinimaxLevel> levels = new List<MinimaxLevel>(maxLevels);
             List<MinimaxNode> newLevelNodes = null;
             char[][][] newLevelData = null;
 
+            // initialize the first level, but don't add it
+            // to the list of the levels becuase it contains the initial state
+            MinimaxLevel currentLevel = new MinimaxLevel(isMax, initialNode);
+
             // if the current level has nodes and the number of levels
             // didn't exceed the max, continue looping (move to the next level)
-            while (currentLevel.Nodes.Length > 0 && levels < maxLevel)
+            while (levelCount < maxLevels)
             {
-                // increment levels counter and choose the other player
-                // as the player of the new level
-                levels++;
-                levelPlayer = (levelPlayer == PlayerType.Human) ? PlayerType.Computer : PlayerType.Human;
+                // set the mini-max value and tile of the current player
+                minimaxValue = isMax ? -1 : +1;
+                nextLevelTile = isMax ? TileC : TileH;
+
+                // choose the other player as the player of the new level
+                isMax = !isMax;
 
                 // loop on the nodes of the current level, get their children
                 // get children only if the node does is not complete nor winning
                 newLevelNodes = new List<MinimaxNode>();
                 foreach (MinimaxNode node in currentLevel.Nodes)
                 {
-                    // check if the node is complete
-                    if (IsComplete(node.State))
-                    {
-                        Utils.DebugLine("Found complete node, level: " + levels);
-                        continue;
-                    }
-
                     // check if the node is winning
                     if (IsWinning(node.State))
                     {
-                        Utils.DebugLine("Found winning node, level: " + levels);
-                        Utils.DebugLine(FormatBranch(node));
-                        return 4;
-                        node.Value = node.Player == PlayerType.Human ? -1 : 1;
+                        node.Value = minimaxValue;
                         continue;
                     }
 
-                    newLevelData = ChildrenStates(node.State, levelPlayer);
-                    newLevelNodes.AddRange(newLevelData.Select(i => new MinimaxNode(i, node, levelPlayer)));
+                    // check if the node is complete
+                    if (IsComplete(node.State))
+                    {
+                        node.Value = minimaxValue;
+                        //node.Value = 1;
+                        continue;
+                    }
+
+                    newLevelData = ChildrenStates(node.State, nextLevelTile);
+                    node.Children = newLevelData.Select(i => new MinimaxNode(i, node)).ToArray();
+                    newLevelNodes.AddRange(node.Children);
 
                     // increment nodes counter
-                    nodes += newLevelData.Length;
+                    nodeCount += newLevelData.Length;
                 }
 
-                // create the new level
-                currentLevel = new Level(newLevelNodes.ToArray());
+                // check if nodes were created for the new level
+                if (newLevelNodes.Count > 0)
+                {
+                    // create the new level
+                    currentLevel = new MinimaxLevel(isMax, newLevelNodes.ToArray());
+                    levels.Add(currentLevel);
 
-                //// for testing
-                //foreach (MinimaxNode n in currentLevel.Nodes)
-                //{
-                //    Utils.DebugLine("\nLevel: " + levels + ", Value: " + n.Value + ", Player: " + n.Player.Description());
-                //    Utils.DebugLine(FormatState(n.State));
-                //}
+                    // increment levels counter
+                    levelCount++;
+                }
+                else
+                {
+                    break;
+                }
             }
 
-            int column = 5;
+            // for the last level, because the strategy applied here
+            // is to stop searching when reaching certain max level, the last
+            // level is likely to have un-finished nodes, set the value
+            // of these nodes as if there are winning nodes
+            MinimaxLevel lastLevel = levels[levels.Count - 1];
+            minimaxValue = lastLevel.IsMax ? -1 : 1;
+            foreach (MinimaxNode node in lastLevel.Nodes)
+            {
+                if (node.Value == 0)
+                {
+                    //node.Value = minimaxValue;
+                    node.Value = -1;
+                }
+            }
+
+            // now, we've all levels, bottom up, calculate all the minimax values
+            // for the nodes in each level
+            IEnumerable<int> values;
+            for (int i = levels.Count - 2; i > -1; i--)
+            {
+                // for each node in the level, if it's value
+                // was not set before (value still = 0), then set
+                // its value as either min. or max. of the values of
+                // the childs
+                foreach (MinimaxNode node in levels[i].Nodes)
+                {
+                    if (node.Value == 0)
+                    {
+                        values = node.Children.Select(j => j.Value);
+                        node.Value = levels[i].IsMax ? values.Max() : values.Min();
+                    }
+                }
+            }
+
+            // for the values of the nodes in the first level
+            // get which one of these nodes has value = 1
+            // then get the column that was played by the 'Computer'
+            List<int> columns = new List<int>();
+            for (int i = 0; i < levels[0].Nodes.Length; i++)
+            {
+                if (levels[0].Nodes[i].Value == 1)
+                {
+                    columns.Add(UnlikeColumn(levels[0].Nodes[i].State, state));
+                }
+            }
+
+            // check if there is no winning column
+            if (columns.Count < 1)
+            {
+                Utils.DebugLine("No 100% winning case, choosing random column!");
+
+                // now since there is no column with 100% winning ratio for 'Computer'
+                // choose arbitrary column that has space
+                // at this point, alculations say if 'Human' is smart, 'Computer'
+                // will never won this game that's why the computer is playing arbitrarely!
+                columns = new List<int>();
+                for (int y = 0; y < boardHeight; y++)
+                {
+                    for (int x = 0; x < boardWidth; x++)
+                    {
+                        if (state[y][x] == TileE)
+                        {
+                            columns.Add(y);
+                            break;
+                        }
+                    }
+                }
+            }
+
+            PrintSearchTree(levels);
+            //Utils.DebugLine("Wining Columns: " + string.Join(",", columns));
+
+            int column = GetRandomColum(columns);
             return column;
         }
 
@@ -725,18 +951,18 @@ namespace ConnectFour
             int count1 = 0;
             int count2 = 0;
 
-            for (int y = 0; y < BoardHeight; y++)
+            for (int y = 0; y < boardHeight; y++)
             {
-                for (int x = 0; x < BoardWidth; x++)
+                for (int x = 0; x < boardWidth; x++)
                 {
                     #region 1. look for n connected tiles horizontally
 
                     // 1.1 right to the current
-                    if (x + TilesToWin - 1 < BoardWidth)
+                    if (x + tilesToWin - 1 < boardWidth)
                     {
                         count1 = 0;
                         count2 = 0;
-                        for (int i = x; i < x + TilesToWin; i++)
+                        for (int i = x; i < x + tilesToWin; i++)
                         {
                             if (state[y][i] == TileH)
                             {
@@ -748,18 +974,18 @@ namespace ConnectFour
                             }
                         }
 
-                        if (count1 == TilesToWin || count2 == TilesToWin)
+                        if (count1 == tilesToWin || count2 == tilesToWin)
                         {
                             return true;
                         }
                     }
 
                     // 1.2 left to the current
-                    if (x - TilesToWin + 1 > -1)
+                    if (x - tilesToWin + 1 > -1)
                     {
                         count1 = 0;
                         count2 = 0;
-                        for (int i = x; i > x - TilesToWin; i--)
+                        for (int i = x; i > x - tilesToWin; i--)
                         {
                             if (state[y][i] == TileH)
                             {
@@ -771,7 +997,7 @@ namespace ConnectFour
                             }
                         }
 
-                        if (count1 == TilesToWin || count2 == TilesToWin)
+                        if (count1 == tilesToWin || count2 == tilesToWin)
                         {
                             return true;
                         }
@@ -782,11 +1008,11 @@ namespace ConnectFour
                     #region 2. look for n connected tiles vertically
 
                     // 2.1 buttom of the current
-                    if (y + TilesToWin - 1 < BoardHeight)
+                    if (y + tilesToWin - 1 < boardHeight)
                     {
                         count1 = 0;
                         count2 = 0;
-                        for (int i = y; i < y + TilesToWin; i++)
+                        for (int i = y; i < y + tilesToWin; i++)
                         {
                             if (state[i][x] == TileH)
                             {
@@ -798,18 +1024,18 @@ namespace ConnectFour
                             }
                         }
 
-                        if (count1 == TilesToWin || count2 == TilesToWin)
+                        if (count1 == tilesToWin || count2 == tilesToWin)
                         {
                             return true;
                         }
                     }
 
                     // 2.2 top of the current
-                    if (y - TilesToWin + 1 > -1)
+                    if (y - tilesToWin + 1 > -1)
                     {
                         count1 = 0;
                         count2 = 0;
-                        for (int i = y; i > y - TilesToWin; i--)
+                        for (int i = y; i > y - tilesToWin; i--)
                         {
                             if (state[i][x] == TileH)
                             {
@@ -821,7 +1047,7 @@ namespace ConnectFour
                             }
                         }
 
-                        if (count1 == TilesToWin || count2 == TilesToWin)
+                        if (count1 == tilesToWin || count2 == tilesToWin)
                         {
                             return true;
                         }
@@ -830,6 +1056,54 @@ namespace ConnectFour
                     #endregion
 
                     #region 3. look for n connected tiles diagonally
+
+                    // 3.1 south-east
+                    if (x + tilesToWin - 1 < boardWidth
+                        && y + tilesToWin - 1 < boardHeight)
+                    {
+                        count1 = 0;
+                        count2 = 0;
+                        for (int i = 0; i < tilesToWin; i++)
+                        {
+                            if (state[y + i][x + i] == TileH)
+                            {
+                                count1++;
+                            }
+                            else if (state[y + i][x + i] == TileC)
+                            {
+                                count2++;
+                            }
+                        }
+
+                        if (count1 == tilesToWin || count2 == tilesToWin)
+                        {
+                            return true;
+                        }
+                    }
+
+                    // 3.2 north-east
+                    if (x + tilesToWin - 1 < boardWidth
+                        && y - tilesToWin + 1 > -1)
+                    {
+                        count1 = 0;
+                        count2 = 0;
+                        for (int i = 0; i < tilesToWin; i++)
+                        {
+                            if (state[y - i][x + i] == TileH)
+                            {
+                                count1++;
+                            }
+                            else if (state[y - i][x + i] == TileC)
+                            {
+                                count2++;
+                            }
+                        }
+
+                        if (count1 == tilesToWin || count2 == tilesToWin)
+                        {
+                            return true;
+                        }
+                    }
 
                     #endregion
                 }
@@ -844,7 +1118,7 @@ namespace ConnectFour
         /// <returns></returns>
         private bool IsComplete(char[][] state)
         {
-            for (int x = 0; x < BoardWidth; x++)
+            for (int x = 0; x < boardWidth; x++)
             {
                 if (state[0][x] == TileE)
                 {
@@ -857,20 +1131,20 @@ namespace ConnectFour
         /// <summary>
         /// Get the possible children (next possible game states) for the current game state.
         /// </summary>
-        private char[][][] ChildrenStates(char[][] parentState, PlayerType player)
+        private char[][][] ChildrenStates(char[][] parentState, char playerTile)
         {
-            char tile = player == PlayerType.Human ? TileH : TileC;
+
             List<char[][]> children = new List<char[][]>();
             char[][] child = null;
 
-            for (int x = 0; x < BoardWidth; x++)
+            for (int x = 0; x < boardWidth; x++)
             {
-                for (int y = BoardHeight - 1; y > -1; y--)
+                for (int y = boardHeight - 1; y > -1; y--)
                 {
                     if (parentState[y][x] == TileE)
                     {
                         child = CloneState(parentState);
-                        child[y][x] = tile;
+                        child[y][x] = playerTile;
                         children.Add(child);
                         break;
                     }
@@ -887,12 +1161,12 @@ namespace ConnectFour
         /// <returns></returns>
         private char[][] CloneState(char[][] state)
         {
-            char[][] newState = new char[BoardHeight][];
+            char[][] newState = new char[boardHeight][];
 
-            for (int y = 0; y < BoardHeight; y++)
+            for (int y = 0; y < boardHeight; y++)
             {
-                newState[y] = new char[BoardWidth];
-                for (int x = 0; x < BoardWidth; x++)
+                newState[y] = new char[boardWidth];
+                for (int x = 0; x < boardWidth; x++)
                 {
                     newState[y][x] = state[y][x];
                 }
@@ -902,39 +1176,71 @@ namespace ConnectFour
         }
 
         /// <summary>
+        /// Return the first column that is different in the given states.
+        /// </summary>
+        /// <returns></returns>
+        private int UnlikeColumn(char[][] stateA, char[][] stateB)
+        {
+            for (int y = 0; y < boardHeight; y++)
+            {
+                for (int x = 0; x < boardWidth; x++)
+                {
+                    if (stateA[y][x] != stateB[y][x])
+                    {
+                        return x;
+                    }
+                }
+            }
+            return -1;
+        }
+
+        /// <summary>
+        /// Get random column from the columns in the given array.
+        /// </summary>
+        /// <returns></returns>
+        private int GetRandomColum(List<int> columns)
+        {
+            Random random = new Random();
+            int index = random.Next(0, columns.Count);
+            int column = columns[index];
+            return column;
+        }
+
+        /// <summary>
         /// Reset the game.
         /// </summary>
         private void ResetGame()
         {
             // reset the tiles
-            for (int y = 0; y < BoardHeight; y++)
+            for (int y = 0; y < boardHeight; y++)
             {
-                for (int x = 0; x < BoardWidth; x++)
+                for (int x = 0; x < boardWidth; x++)
                 {
                     blocks[y][x].Fill = transparentBrush;
                 }
             }
 
             // define initial state
-            boardState = new char[BoardHeight][];
-            for (int y = 0; y < BoardHeight; y++)
+            boardState = new char[boardHeight][];
+            for (int y = 0; y < boardHeight; y++)
             {
-                boardState[y] = new char[BoardWidth];
-                for (int x = 0; x < BoardWidth; x++)
+                boardState[y] = new char[boardWidth];
+                for (int x = 0; x < boardWidth; x++)
                 {
                     boardState[y][x] = TileE;
                 }
             }
 
             // reset the counters
-            nodes = 0;
-            levels = 0;
+            nodeCount = 0;
+            levelCount = 0;
 
             // game stats
             currentPlayer = (bool)radioButtonHuman.IsChecked ? PlayerType.Human : PlayerType.Computer;
             labelGameStatus.Content = gameStatus.Description();
             labelCurrentPlayer.Content = currentPlayer.Description();
             ellipseCurrentPlayer.Fill = PlayerColor(currentPlayer);
+            textBoxOutput.Text = string.Empty;
         }
 
         /// <summary>
@@ -944,6 +1250,7 @@ namespace ConnectFour
         {
             Dispatcher.Invoke(() =>
             {
+                ButtonStart_Click(null, null);
                 groupBoxGameBoard.IsEnabled = false;
                 MessageBox.Show(message, "Game", MessageBoxButton.OK);
             });
