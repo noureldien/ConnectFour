@@ -38,18 +38,18 @@
         <GroupBox x:Name="groupBoxSearchType" Header="Search Type" HorizontalAlignment="Left" Margin="224,360,0,0" VerticalAlignment="Top" Width="110" Height="82">
             <StackPanel Orientation="Vertical">
                 <RadioButton x:Name="radioButtonMinimax" Content="Minimax" Tag="0" GroupName="SearchType" Width="80" Margin="0,10,0,0" HorizontalAlignment="Left" IsChecked="True" Click="RadioButtonSearch_Click"/>
-                <RadioButton x:Name="radioButtonAlphaBeta" Content="Alpha-Beta" Tag="1" GroupName="SearchType" Width="80" Margin="0,10,0,0" HorizontalAlignment="Left" Click="RadioButtonSearch_Click"/>
+                <RadioButton x:Name="radioButtonRandom" Content="Random" Tag="1" GroupName="SearchType" Width="80" Margin="0,10,0,0" HorizontalAlignment="Left" Click="RadioButtonSearch_Click"/>
             </StackPanel>
         </GroupBox>
         <GroupBox x:Name="groupBoxFirstPlayer" Header="First Player" HorizontalAlignment="Left" Margin="344,360,0,0" VerticalAlignment="Top" Width="110" Height="82">
-            <StackPanel Orientation="Vertical">
+            <StackPanel Orientation="Vertical">                
                 <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
-                    <RadioButton x:Name="radioButtonHuman" Content="Human" Tag="0" GroupName="FirstPlayer" Width="80" IsChecked="True" Click="RadioButtonPlayer_Click"/>
-                    <Ellipse StrokeThickness="1" Stroke="Black" Fill="Red" VerticalAlignment="Center" Width="8" Height="8"/>
+                    <RadioButton x:Name="radioButtonComputer" Content="Computer" Tag="1" GroupName="FirstPlayer" Width="80" IsChecked="True" Click="RadioButtonPlayer_Click"/>
+                    <Ellipse StrokeThickness="1" Stroke="Black" Fill="Blue" VerticalAlignment="Center" Width="8" Height="8"/>
                 </StackPanel>
                 <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
-                    <RadioButton x:Name="radioButtonComputer" Content="Computer" Tag="1" GroupName="FirstPlayer" Width="80" Click="RadioButtonPlayer_Click"/>
-                    <Ellipse StrokeThickness="1" Stroke="Black" Fill="Blue" VerticalAlignment="Center" Width="8" Height="8"/>
+                    <RadioButton x:Name="radioButtonHuman" Content="Human" Tag="0" GroupName="FirstPlayer" Width="80" Click="RadioButtonPlayer_Click"/>
+                    <Ellipse StrokeThickness="1" Stroke="Black" Fill="Red" VerticalAlignment="Center" Width="8" Height="8"/>
                 </StackPanel>
             </StackPanel>
         </GroupBox>
@@ -66,9 +66,9 @@
                     <Label Content="Tiles-To-Win:"/>
                 </StackPanel>
                 <StackPanel Orientation="Vertical" Grid.Column="1">
-                    <Slider x:Name="sliderBoardWidth" Margin="0,5,0,0" Value="4" Minimum="3" Maximum="8" IsSnapToTickEnabled="True" TickFrequency="1"/>
-                    <Slider x:Name="sliderBoardHeight" Margin="0,8,0,0" Value="3" Minimum="3" Maximum="7" IsSnapToTickEnabled="True" TickFrequency="1"/>
-                    <Slider x:Name="sliderTilesToWin" Margin="0,8,0,0" Value="3" Minimum="2" Maximum="5" IsSnapToTickEnabled="True" TickFrequency="1"/>
+                    <Slider x:Name="sliderBoardWidth" Margin="0,5,0,0" Value="7" Minimum="3" Maximum="8" IsSnapToTickEnabled="True" TickFrequency="1"/>
+                    <Slider x:Name="sliderBoardHeight" Margin="0,8,0,0" Value="6" Minimum="3" Maximum="7" IsSnapToTickEnabled="True" TickFrequency="1"/>
+                    <Slider x:Name="sliderTilesToWin" Margin="0,8,0,0" Value="4" Minimum="2" Maximum="5" IsSnapToTickEnabled="True" TickFrequency="1"/>
                 </StackPanel>
                 <StackPanel Orientation="Vertical" Grid.Column="2">
                     <Label Content="{Binding ElementName=sliderBoardWidth, Path=Value}"/>
@@ -92,8 +92,8 @@
                 <StackPanel Orientation="Vertical" Grid.Column="1">
                     <Label x:Name="labelGameStatus" Content="Stopped"/>
                     <StackPanel Orientation="Horizontal">
-                        <Label x:Name="labelCurrentPlayer" Content="Human"/>
-                        <Ellipse x:Name="ellipseCurrentPlayer" StrokeThickness="1" Stroke="Black" Fill="Red" Margin="10,2,0,0" VerticalAlignment="Center" Width="8" Height="8"/>
+                        <Label x:Name="labelCurrentPlayer" Content="Computer"/>
+                        <Ellipse x:Name="ellipseCurrentPlayer" StrokeThickness="1" Stroke="Black" Fill="Blue" Margin="10,2,0,0" VerticalAlignment="Center" Width="8" Height="8"/>
                     </StackPanel>
                     <Label x:Name="labelGameLevels"/>
                     <Label x:Name="labelGameNodes"/>
