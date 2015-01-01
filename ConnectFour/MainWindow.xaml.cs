@@ -142,6 +142,10 @@ namespace ConnectFour
         /// Thread used to update the counters in the UI.
         /// </summary>
         private Thread infoThread;
+        /// <summary>
+        /// Is playing in 'Simulated Human' instead of 'Real Human'.
+        /// </summary>
+        private bool isHumanSimulated;
 
         #endregion
 
@@ -184,6 +188,7 @@ namespace ConnectFour
                 groupBoxSearchType.IsEnabled = false;
                 groupBoxFirstPlayer.IsEnabled = false;
                 groupBoxOptions.IsEnabled = false;
+                checkBoxHumanSimulated.IsEnabled = false;
                 buttonStart.Content = "■";
                 buttonStart.ToolTip = "End the game.";
                 gameStatus = GameStatus.Started;
@@ -192,6 +197,10 @@ namespace ConnectFour
                 {
                     NextStepComputer();
                 }
+                else if (isHumanSimulated)
+                {
+                    NextStepHumanSimulated();
+                }
             }
             else if (gameStatus == GameStatus.Started)
             {
@@ -199,6 +208,7 @@ namespace ConnectFour
                 groupBoxSearchType.IsEnabled = true;
                 groupBoxFirstPlayer.IsEnabled = true;
                 groupBoxOptions.IsEnabled = true;
+                checkBoxHumanSimulated.IsEnabled = true;
                 buttonStart.Content = "►";
                 buttonStart.ToolTip = "Start the game.";
                 gameStatus = GameStatus.Stopped;
@@ -279,7 +289,7 @@ namespace ConnectFour
         /// <param name="e"></param>
         private void Ellipse_MouseDown(object sender, MouseButtonEventArgs e)
         {
-            if (currentPlayer == PlayerType.Computer)
+            if (currentPlayer == PlayerType.Computer || isHumanSimulated)
             {
                 PlaySound(SoundType.Error);
                 return;
@@ -299,6 +309,16 @@ namespace ConnectFour
 
             // play the next step by 'Human'
             NextStepHuman(column);
+        }
+
+        /// <summary>
+        /// Change the flag of 'isHumanSimluated'.
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
+        private void CheckBoxHumanSimulated_Click(object sender, RoutedEventArgs e)
+        {
+            isHumanSimulated = (bool)checkBoxHumanSimulated.IsChecked;
         }
 
         /// <summary>
@@ -605,6 +625,73 @@ namespace ConnectFour
             ellipse.Fill.BeginAnimation(SolidColorBrush.ColorProperty, animation);
         }
 
+        /// <summary>
+        /// Reset the game.
+        /// </summary>
+        private void ResetGame()
+        {
+            // reset the tiles
+            for (int y = 0; y < boardHeight; y++)
+            {
+                for (int x = 0; x < boardWidth; x++)
+                {
+                    blocks[y][x].Fill = transparentBrush;
+                }
+            }
+
+            // define initial state
+            boardState = new char[boardHeight][];
+            for (int y = 0; y < boardHeight; y++)
+            {
+                boardState[y] = new char[boardWidth];
+                for (int x = 0; x < boardWidth; x++)
+                {
+                    boardState[y][x] = TileE;
+                }
+            }
+
+            // reset the counters
+            nodeCount = 0;
+            levelCount = 0;
+
+            // game stats
+            currentPlayer = (bool)radioButtonHuman.IsChecked ? PlayerType.Human : PlayerType.Computer;
+            labelGameStatus.Content = gameStatus.Description();
+            labelCurrentPlayer.Content = currentPlayer.Description();
+            ellipseCurrentPlayer.Fill = PlayerColor(currentPlayer);
+            textBoxOutput.Text = string.Empty;
+        }
+
+        /// <summary>
+        /// Display a message declaring the end of the game and the result.
+        /// </summary>
+        private void FinishGame(string message)
+        {
+            Dispatcher.Invoke(() =>
+            {
+                ButtonStart_Click(null, null);
+                groupBoxGameBoard.IsEnabled = false;
+                MessageBox.Show(message, "Game", MessageBoxButton.OK);
+
+                // for reporting purposes, count empty tiles
+                int emptyCount = 0;
+                gameID++;
+                for (int y = 0; y < boardHeight; y++)
+                {
+                    for (int x = 0; x < boardWidth; x++)
+                    {
+                        if (boardState[y][x] == TileE)
+                        {
+                            emptyCount++;
+                        }
+                    }
+                }
+                Utils.DebugLine(string.Format("Game: {0}, Empty Count: {1}", gameID, emptyCount));
+            });
+        }
+
+        int gameID = 0;
+
         #endregion
 
         #region Search Methods
@@ -667,6 +754,26 @@ namespace ConnectFour
         }
 
         /// <summary>
+        /// Play the next step in the game by the first player 'Human'.
+        /// </summary>
+        /// <param name="column"></param>
+        private void NextStepHumanSimulated()
+        {
+            // reset counters and update UI
+            levelCount = 0;
+            nodeCount = 0;
+            //UpdateCounters();
+
+            // initialize the search and info threads.
+            searchThread = new Thread(HumanSimulatedSearchInvoker);
+            infoThread = new Thread(UpdateCountersInvoker);
+
+            // start the threads
+            searchThread.Start();
+            infoThread.Start();
+        }
+
+        /// <summary>
         /// Play the next step on the game by the second player 'Computer'.
         /// </summary>
         private void NextStepComputer()
@@ -674,10 +781,10 @@ namespace ConnectFour
             // reset counters and update UI
             levelCount = 0;
             nodeCount = 0;
-            UpdateCounters();
+            //UpdateCounters();
 
             // initialize the search and info threads.
-            searchThread = new Thread(SearchInvoker);
+            searchThread = new Thread(ComputerSearchInvoker);
             infoThread = new Thread(UpdateCountersInvoker);
 
             // start the threads
@@ -688,7 +795,7 @@ namespace ConnectFour
         /// <summary>
         /// Calls the suitable search algorithm according to the users preferences.
         /// </summary>
-        private void SearchInvoker()
+        private void ComputerSearchInvoker()
         {
             int column = -1;
             if (searchType == SearchType.Minimax)
@@ -754,6 +861,85 @@ namespace ConnectFour
 
             // switch the current player
             SwitchPlayer(PlayerType.Human);
+
+            // check if 'Human' is simulated, call it
+            if (isHumanSimulated)
+            {
+                NextStepHumanSimulated();
+            }
+        }
+
+        /// <summary>
+        /// Calls the suitable search algorithm according to the users preferences.
+        /// </summary>
+        private void HumanSimulatedSearchInvoker()
+        {
+            int column = -1;
+            if (searchType == SearchType.Minimax)
+            {
+                column = Minimax(boardState);
+            }
+            else if (searchType == SearchType.AlphaBeta)
+            {
+                column = Dummy(boardState);
+            }
+
+            // stop the info thread
+            if (infoThread != null && infoThread.IsAlive)
+            {
+                infoThread.Abort();
+            }
+            Dispatcher.Invoke(() =>
+            {
+                UpdateCounters();
+            });
+
+            // check if the search algorithm didn't find a column
+            if (column == -1)
+            {
+                string message = "Algorithm couldn't find a column, it returned -1";
+                FinishGame(message);
+                return;
+            }
+
+            Utils.DebugLine("Algorithm column: " + column);
+
+            // fill in the current tile buy 'Human', switch player
+            // and let 'Computer' play the next step
+            for (int y = boardHeight - 1; y > -1; y--)
+            {
+                if (boardState[y][column] == TileE)
+                {
+                    boardState[y][column] = TileH;
+                    Dispatcher.Invoke(() =>
+                    {
+                        SetTileColor(blocks[y][column], currentPlayer);
+                    });
+                    Utils.DebugLine("Filled tile (x, y): " + column + ", " + y);
+                    break;
+                }
+            }
+
+            // check if the game won
+            if (IsWinning(boardState))
+            {
+                string message = "Game ended, human won!";
+                FinishGame(message);
+                return;
+            }
+
+            // check if the game ended
+            if (IsComplete(boardState))
+            {
+                string message = "Game ended with tie!";
+                FinishGame(message);
+                return;
+            }
+
+            // switch the current player
+            // and call the computer to play the next step
+            SwitchPlayer(PlayerType.Computer);
+            NextStepComputer();
         }
 
         /// <summary>
@@ -929,11 +1115,23 @@ namespace ConnectFour
                 }
             }
 
-            // check if there is no winning column
-            if (columns.Count > 0)
+
+            // if only one column, then return it
+            if (columns.Count == 1)
             {
-                column = GetRandomColum(columns);
-                Utils.DebugLine("Wining Columns: " + string.Join(",", columns));
+                column = columns[0];
+            }
+            else if (columns.Count > 0)
+            {
+                // if more than one random column, check if the there is
+                // an imminent opportunity needs to be seized
+                column = OffensiveColumn(state);
+                Utils.DebugLine("OffensiveColumn returned: " + column);
+                if (column == -1)
+                {
+                    column = GetRandomColum(columns);
+                }
+                Utils.DebugLine("Wining Columns: " + string.Join(",", columns) + ", and the choosed one is: " + column);
             }
             else
             {
@@ -1251,15 +1449,13 @@ namespace ConnectFour
         }
 
         /// <summary>
-        /// 
+        /// Get the column to stop an imminent attack (if any).
+        /// Return -1 if such column was not found.
         /// </summary>
         /// <param name="state"></param>
         /// <returns></returns>
         private int DefensiveColumn(char[][] state)
         {
-            int countY = 0;
-            int countX = 0;
-
             int yIndex;
 
             // loop on the columns of the game
@@ -1346,6 +1542,99 @@ namespace ConnectFour
         }
 
         /// <summary>
+        /// Get the column to stop an imminent winning opportunity needs to be seized (if any).
+        /// Return -1 if such column was not found.
+        /// </summary>
+        /// <param name="state"></param>
+        /// <returns></returns>
+        private int OffensiveColumn(char[][] state)
+        {
+            int yIndex;
+
+            // loop on the columns of the game
+            for (int x = 0; x < boardWidth; x++)
+            {
+                // check if the  column has empty tile (1 at least)
+                // so this column can have a next step
+                yIndex = -1;
+                for (int y = boardHeight - 1; y > -1; y--)
+                {
+                    if (state[y][x] == TileE)
+                    {
+                        yIndex = y;
+                        break;
+                    }
+                }
+                if (yIndex == -1)
+                {
+                    continue;
+                }
+
+                // now we're sure that this column contains an empty tile
+                // and we have the row number of this tile
+                // go check the tiles under it, if they are TilesToWin-1
+                // and all of them belong to the 'Computer', return
+                // the current column
+                if (boardHeight - (yIndex + 1) >= tilesToWin - 1)
+                {
+                    bool isOpporentTile = true;
+                    for (int i = 1; i < tilesToWin; i++)
+                    {
+                        if (state[yIndex + i][x] != TileC)
+                        {
+                            isOpporentTile = false;
+                            break;
+                        }
+                    }
+                    if (isOpporentTile)
+                    {
+                        return x;
+                    }
+                }
+
+                // now check the left and right tiles to see if the 'Computer'
+                // will win of he places his tile in the current column
+                // in the current row (yIndex)
+                // look on the right
+                if (boardWidth - (x + 1) >= tilesToWin - 1)
+                {
+                    bool isOpporentTile = true;
+                    for (int i = 1; i < tilesToWin; i++)
+                    {
+                        if (state[yIndex][x + i] != TileC)
+                        {
+                            isOpporentTile = false;
+                            break;
+                        }
+                    }
+                    if (isOpporentTile)
+                    {
+                        return x;
+                    }
+                }
+                // look on the left
+                if (x >= tilesToWin - 1)
+                {
+                    bool isOpporentTile = true;
+                    for (int i = 1; i < tilesToWin; i++)
+                    {
+                        if (state[yIndex][x - i] != TileC)
+                        {
+                            isOpporentTile = false;
+                            break;
+                        }
+                    }
+                    if (isOpporentTile)
+                    {
+                        return x;
+                    }
+                }
+            }
+
+            return -1;
+        }
+
+        /// <summary>
         /// Get random column from the columns in the given array.
         /// </summary>
         /// <returns></returns>
@@ -1379,56 +1668,6 @@ namespace ConnectFour
             }
 
             return maxLevels;
-        }
-
-        /// <summary>
-        /// Reset the game.
-        /// </summary>
-        private void ResetGame()
-        {
-            // reset the tiles
-            for (int y = 0; y < boardHeight; y++)
-            {
-                for (int x = 0; x < boardWidth; x++)
-                {
-                    blocks[y][x].Fill = transparentBrush;
-                }
-            }
-
-            // define initial state
-            boardState = new char[boardHeight][];
-            for (int y = 0; y < boardHeight; y++)
-            {
-                boardState[y] = new char[boardWidth];
-                for (int x = 0; x < boardWidth; x++)
-                {
-                    boardState[y][x] = TileE;
-                }
-            }
-
-            // reset the counters
-            nodeCount = 0;
-            levelCount = 0;
-
-            // game stats
-            currentPlayer = (bool)radioButtonHuman.IsChecked ? PlayerType.Human : PlayerType.Computer;
-            labelGameStatus.Content = gameStatus.Description();
-            labelCurrentPlayer.Content = currentPlayer.Description();
-            ellipseCurrentPlayer.Fill = PlayerColor(currentPlayer);
-            textBoxOutput.Text = string.Empty;
-        }
-
-        /// <summary>
-        /// Display a message declaring the end of the game and the result.
-        /// </summary>
-        private void FinishGame(string message)
-        {
-            Dispatcher.Invoke(() =>
-            {
-                ButtonStart_Click(null, null);
-                groupBoxGameBoard.IsEnabled = false;
-                MessageBox.Show(message, "Game", MessageBoxButton.OK);
-            });
         }
 
         #endregion
